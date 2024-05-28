@@ -9,8 +9,8 @@ import (
 
 	"github.com/hashicorp/go-azure-helpers/lang/pointer"
 	"github.com/hashicorp/go-hclog"
+	generatorjson "github.com/hashicorp/pandora/tools/data-api-sdk/v1/generator-json"
 	"github.com/hashicorp/pandora/tools/data-api-sdk/v1/models"
-	"github.com/hashicorp/pandora/tools/importer-rest-api-specs/components/dataapigeneratorjson"
 	"github.com/hashicorp/pandora/tools/importer-rest-api-specs/components/discovery"
 	"github.com/hashicorp/pandora/tools/importer-rest-api-specs/components/terraform"
 	terraformModels "github.com/hashicorp/pandora/tools/importer-rest-api-specs/components/terraform/models"
@@ -22,7 +22,7 @@ import (
 func runImporter(input RunInput, generationData []discovery.ServiceInput, swaggerGitSha string) error {
 	sourceDataType := models.ResourceManagerSourceDataType
 	sourceDataOrigin := models.AzureRestAPISpecsSourceDataOrigin
-	repo := dataapigeneratorjson.NewRepository(input.OutputDirectory)
+	repo := generatorjson.NewRepository(input.OutputDirectory)
 
 	// group the API Versions by Service
 	dataByServices := make(map[string][]discovery.ServiceInput)
@@ -51,7 +51,7 @@ func runImporter(input RunInput, generationData []discovery.ServiceInput, swagge
 		serviceDetails := dataByServices[serviceName]
 
 		logging.Log.Debug(fmt.Sprintf("Removing any existing API Definitions for the Service %q", serviceName))
-		removeServiceOpts := dataapigeneratorjson.RemoveServiceOptions{
+		removeServiceOpts := generatorjson.RemoveServiceOptions{
 			ServiceName:      serviceName,
 			SourceDataOrigin: sourceDataOrigin,
 			SourceDataType:   sourceDataType,
@@ -69,7 +69,7 @@ func runImporter(input RunInput, generationData []discovery.ServiceInput, swagge
 	return nil
 }
 
-func runImportForService(input RunInput, serviceName string, apiVersionsForService []discovery.ServiceInput, sourceDataType models.SourceDataType, sourceDataOrigin models.SourceDataOrigin, logger hclog.Logger, swaggerGitSha string, repo dataapigeneratorjson.Repository) error {
+func runImportForService(input RunInput, serviceName string, apiVersionsForService []discovery.ServiceInput, sourceDataType models.SourceDataType, sourceDataOrigin models.SourceDataOrigin, logger hclog.Logger, swaggerGitSha string, repo generatorjson.Repository) error {
 	task := pipelineTask{}
 	var resourceProvider *string
 	var terraformPackageName *string
@@ -128,7 +128,7 @@ func runImportForService(input RunInput, serviceName string, apiVersionsForServi
 		}
 	}
 
-	// Populate all of the data for this API Version..
+	// Populate all the data for this API Version..
 	dataForApiVersions := make([]importerModels.AzureApiDefinition, 0)
 	for apiVersion, api := range consolidatedApiVersions {
 		versionLogger := logger.Named(fmt.Sprintf("Importer for API Version %q", apiVersion))
@@ -155,7 +155,7 @@ func runImportForService(input RunInput, serviceName string, apiVersionsForServi
 		dataForApiVersions = append(dataForApiVersions, *dataForApiVersion)
 	}
 
-	// Now that we've got all of the API Versions, build up the Terraform Resources
+	// Now that we've got all the API Versions, build up the Terraform Resources
 	// NOTE: in the near future this will be refactored to be for a Service, this is a stepping-stone refactor
 	// in that direction - as that requires more significant refactoring to the `terraform` package.
 	dataForApiVersionsWithTerraformDetails := make([]importerModels.AzureApiDefinition, 0)
@@ -177,13 +177,13 @@ func runImportForService(input RunInput, serviceName string, apiVersionsForServi
 	// Now that we have the populated data, let's go ahead and output that..
 	logger.Info(fmt.Sprintf("Persisting API Definitions for Service %s..", serviceName))
 
-	opts := dataapigeneratorjson.SaveServiceOptions{
-		AzureRestAPISpecsGitSHA: pointer.To(swaggerGitSha),
-		ResourceProvider:        resourceProvider,
-		Service:                 *service,
-		ServiceName:             serviceName,
-		SourceDataOrigin:        sourceDataOrigin,
-		SourceDataType:          sourceDataType,
+	opts := generatorjson.SaveServiceOptions{
+		SourceDataGitSHA: pointer.To(swaggerGitSha),
+		ResourceProvider: resourceProvider,
+		Service:          *service,
+		ServiceName:      serviceName,
+		SourceDataOrigin: sourceDataOrigin,
+		SourceDataType:   sourceDataType,
 	}
 	if err := repo.SaveService(opts); err != nil {
 		return fmt.Errorf("persisting Data API Definitions for Service %q: %+v", serviceName, err)
